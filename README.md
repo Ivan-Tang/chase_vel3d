@@ -1,181 +1,230 @@
-# 3D 日珥速度分析 (3D Velocity Analysis for Prominences)
+# chase_vel3d: 3D Velocity Analysis for Solar Prominences
 
-## 项目概述
+A comprehensive Python package for 3D velocity analysis of solar prominences using CHASE (Chinese H-alpha Solar Explorer) satellite RSM (Ramsey Spectral Module) data.
 
-本项目基于 **CHASE (Chinese H-alpha Solar Explorer)** 卫星的 RSM (Ramsey Spectral Module) 数据，对太阳日珥的三维速度进行系统分析。
+## Overview
 
-## 主要功能模块
+The `chase_vel3d` package provides a complete pipeline for analyzing three-dimensional velocity fields in solar prominences by combining:
 
-### 1. **数据加载与基本可视化** 📊
-- 加载 FITS 格式的 CHASE/RSM 光谱数据
-- 显示 Ha 核心 (Ha Core) 和 Ha 翼 (Ha Wing) 的空间分布
-- 构建 SunPy Map 对象用于进一步分析
+- **Line-of-Sight (LOS) velocities** from spectral analysis
+- **Plane-of-Sky (POS) velocities** from image tracking methods
+- **Comprehensive data processing** for CHASE/RSM FITS data
 
-### 2. **图像对齐** 🎯
-基于 FITS 头部的 CRPIX 信息补偿太阳中心位移：
-- `align_images_by_crpix()` - 全图对齐
-- `align_submaps_by_crpix()` - 感兴趣区域对齐
-- 可选的 FFT 相关性精细对齐（±5像素范围）
-- 输出位移量时间序列
+This package enables solar physicists to reconstruct full 3D velocity fields from CHASE observations, facilitating detailed study of prominence dynamics and evolution.
 
-### 3. **视频生成** 🎬
-#### 对齐视频
-- **全过程视频** - Ha Core 和 Ha Wing 并排显示
-- **子图视频** - 主图+细节图+连接线的复合视频
-- **对比视频** - 对齐前后的并排对比
+## Features
 
-关键函数：
-- `create_aligned_video()` - 生成全过程视频
-- `create_aligned_subplot_video()` - 生成子图视频
-- `create_comparison_video()` - 生成对比视频
+### Core Capabilities
+- **End-to-end pipeline** from raw FITS data to 3D velocity fields
+- **Multi-temporal image alignment** using CRPIX information with optional FFT refinement
+- **Region classification** (on plate/limb/space) for adaptive analysis
+- **Multiple velocity calculation methods**:
+  - LOS: Moment method for limb prominences, Cloud model for on-disk filaments
+  - POS: Fourier Local Correlation Tracking (FLCT), Farneback optical flow
+- **Advanced filament detection** with adaptive thresholding and morphological cleaning
+- **High-quality visualization** including video generation of aligned sequences
+- **Parallel processing** for efficient time-series analysis
 
-### 4. **LOS (Line-of-Sight) 速度计算** 📈
-#### 点分类
-识别三类点：
-- **On Plate** (吸收线) - 类型 0
-- **On Limb** (日珥发射) - 类型 1
-- **In Space** (弱信号) - 类型 2
+### Scientific Applications
+- 3D velocity field reconstruction in solar prominences
+- Prominence/filament dynamics analysis
+- CHASE/RSM data processing and visualization
+- Solar atmospheric physics research
 
-关键函数：
-- `wave_pattern()` - 谱线模式分类
-- `classify_region()` - 区域分类
-- `majority_filter()` - 多数投票滤波
-- `clean_prominence_mask()` - 形态学清理
+## Installation
 
-#### 速度计算（Moment 方法）
-基于光谱谱线的矩方法计算 LOS 速度：
-- `moment_velocity_emission()` - 日珥发射谱线速度
-- `velocity_map_from_mask_on_limb()` - 生成速度图
+### Prerequisites
+- Python 3.8+
+- Basic scientific stack: NumPy, SciPy, Matplotlib
+- Solar physics libraries: Astropy, SunPy
 
-### 5. **POS (Plane-of-Sky) 速度计算** 🌪️
-#### 时间序列追踪
-基于连通域匹配的速度计算：
-- `pos_velocity_from_masks()` - 最近邻匹配
-- `extract_objects()` - 连通分量提取
+### Dependencies
+The package requires the following Python packages:
+- `numpy`, `scipy`, `matplotlib`
+- `astropy` (FITS I/O, coordinate handling)
+- `sunpy` (solar physics data handling)
+- `scikit-image` (morphological operations)
+- `pyflct` (Fourier Local Correlation Tracking)
+- `opencv-python` (video generation)
 
-#### 光流方法
-- **Farneback** - 密集光流计算
-- **FLCT** (Fourier Local Correlation Tracking) - 相关性追踪
-
-### 6. **谱线分析** 📊
-- **高斯拟合** - 单/双高斯分量拟合
-- **等强度线** - 多层次等强度线提取
-- **相关性分析** - Pearson 相关系数计算
-- **中心重心法** - 谱线中心确定
-
-## 数据流程
-
-```
-FITS 数据加载
-    ↓
-图像对齐 (CRPIX)
-    ↓
-区域分类 (On Plate/Limb/Space)
-    ↓
-├─ LOS 速度 (Moment 方法)
-├─ POS 速度 (Farneback / FLCT)
-└─ 谱线分析 (高斯拟合)
-    ↓
-视频/报告输出
+### Installation from source
+```bash
+git clone https://github.com/Ivan-Tang/chase_vel3d.git
+cd chase_vel3d
+pip install -e .
 ```
 
-## 使用指南
+## Quick Start
 
-### 快速开始
-
+### Basic Usage
 ```python
-# 1. 加载数据
+from chase_vel3d import alignment, classification, velocity_los
 from astropy.io import fits
-rsms = []
-for file in files:
-    rsm = fits.open(file)
-    rsms.append(rsm)
 
-# 2. 对齐图像
-aligned_data, shifts = align_images_by_crpix(rsms, reference_idx=0)
+# Load CHASE/RSM data
+rsms = [fits.open(f) for f in files]
 
-# 3. 生成视频
-create_aligned_video(aligned_data, rsms, fps=5)
-create_aligned_subplot_video(aligned_data, rsms, 800, 1100, -100, 200, fps=5)
+# Align images using CRPIX information
+aligned_data, shifts = alignment.align_images_by_crpix(rsms, reference_idx=0)
 
-# 4. 计算速度
-type_mask = classify_region(rsm, left, right, bottom, top)
-vel_limb = velocity_map_from_mask_on_limb(rsm, left, right, bottom, top, type_mask)
+# Classify regions (on plate/limb/space)
+type_mask = classification.classify_region(rsm, left, right, bottom, top)
+
+# Calculate LOS velocities
+vel_map = velocity_los.calc_moment_vmap(hdr, data, roi_xy, type_mask)
 ```
 
-### 参数配置
+### Pipeline Usage
+```python
+from chase_vel3d import Vel3dPipeline
 
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `left, right, bottom, top` | 感兴趣区域范围 (arcsec) | 800, 1100, -100, 200 |
-| `ang_res` | 角分辨率 | 0.5218 × 2 arcsec/pixel |
-| `fps` | 视频帧率 | 5 fps |
-| `snr_th` | 信噪比阈值 | 5.0 |
-| `core_half_A` | 谱线核心半宽 (Å) | 0.6 |
+# Initialize pipeline
+pipeline = Vel3dPipeline(data_dir="./data", output_dir="./output")
 
-## 输出文件
+# Run complete analysis
+pipeline.run(roi_xy=(400, 900, 300, 800),
+             bg_xy=(400, 500, 300, 400),
+             los_type="disk")
+```
+
+## Package Structure
+
+### Main Modules
+- **`alignment.py`** - Image alignment using CRPIX information
+- **`classification.py`** - Point classification and filament mask extraction
+- **`velocity_los.py`** - LOS velocity calculation (moment method, cloud model)
+- **`velocity_pos.py`** - POS velocity calculation (FLCT, optical flow)
+- **`spectral_analysis.py`** - Spectral line fitting and analysis
+- **`video_generation.py`** - Video generation from aligned sequences
+- **`pipeline.py`** - Complete workflow orchestration (`Vel3dPipeline` class)
+- **`datamodel.py`** - Data structures (`Velocity3D`, `VelPOS2D`, `VelLOS2D`)
+- **`coords.py`** - Coordinate transformations and grid management
+- **`utils.py`** - Utility functions for FITS header parsing
+
+### Data Flow
+```
+FITS Data Loading
+    ↓
+Image Alignment (CRPIX-based)
+    ↓
+Region Classification & Filament Masking
+    ↓
+├─ LOS Velocity Calculation
+│   ├─ Moment method (limb prominences)
+│   └─ Cloud model (on-disk filaments)
+├─ POS Velocity Calculation
+│   └─ FLCT method (absorption proxy tracking)
+└─ Spectral Analysis
+    ↓
+3D Velocity Combination & Visualization
+    ↓
+Video/Report Output
+```
+
+## Key Functions
+
+### Image Processing
+- `align_images_by_crpix()` - Multi-temporal image alignment
+- `align_submaps_by_crpix()` - Sub-region alignment
+- `get_solar_center()` - Extract solar center coordinates
+
+### Region Classification
+- `classify_region()` - Classify points as on plate/limb/space
+- `wave_pattern()` - Spectral line pattern classification
+- `get_filament_mask()` - Adaptive filament detection
+
+### Velocity Calculation
+- `calc_moment_vmap()` - LOS velocity via moment method
+- `fit_cloud_on_mask()` - LOS velocity via cloud model
+- `compute_pos_v()` - POS velocity via FLCT
+- `pos_velocity_from_masks()` - POS velocity via object tracking
+
+### Visualization
+- `create_aligned_video()` - Generate aligned sequence video
+- `create_aligned_subplot_video()` - Generate subplot video
+- `create_comparison_video()` - Generate comparison video
+
+## Configuration Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `roi_xy` | Region of interest (x0,x1,y0,y1) in arcsec | (400, 900, 300, 800) |
+| `bg_xy` | Background region for normalization | (400, 500, 300, 400) |
+| `ang_res` | Angular resolution | 0.5218 × 2 arcsec/pixel |
+| `fps` | Video frame rate | 5 fps |
+| `snr_th` | Signal-to-noise threshold | 5.0 |
+| `core_half_A` | Hα core half-width | 0.6 Å |
+| `alpha` | Filament detection threshold ratio | 0.85 |
+
+## Output Structure
 
 ```
-frames/
+output/
 ├── aligned_video/
-│   ├── aligned_full_video.mp4          # 全过程视频
-│   └── frames_tmp/                      # 临时帧文件
+│   ├── aligned_full_video.mp4          # Full aligned sequence
+│   └── frames_tmp/                     # Temporary frame files
 ├── aligned_subplot/
-│   ├── aligned_subplot_video.mp4       # 子图视频
+│   ├── aligned_subplot_video.mp4       # Subplot video
 │   └── frames_tmp/
-└── comparison/
-    ├── comparison_video.mp4             # 对比视频
+├── comparison/
+│   ├── comparison_video.mp4            # Comparison video
+│   └── frames_tmp/
+└── los_velocity/
+    ├── los_velocity.mp4                # LOS velocity visualization
     └── frames_tmp/
 ```
 
-## 核心特性
+## Scientific Context
 
-✨ **多层次分析**
-- 全图到子图的分层分析
-- 时间序列连贯性保证
+### CHASE Satellite
+- **CHASE (Chinese H-alpha Solar Explorer)** - Chinese space-based solar observatory
+- **RSM (Ramsey Spectral Module)** - Spectrometer for Hα line observations
+- **Hα spectral line** - 6562.8 Å, sensitive to solar chromosphere and prominences
 
-🔬 **先进的速度测量**
-- 多种谱线分析方法
-- LOS 和 POS 速度的联合计算
+### Velocity Components
+- **Line-of-Sight (LOS) velocity** - Radial motion toward/away from observer
+- **Plane-of-Sky (POS) velocity** - Tangential motion in plane of sky
+- **3D velocity field** - Combination of LOS and POS components
 
-📹 **高质量可视化**
-- 高分辨率视频输出
-- 实时位移量可视化
-- 对齐效果对比
+### Prominence Types
+- **Prominence** - Cool, dense plasma suspended in solar corona
+- **Filament** - Prominence seen against solar disk
+- **Limb prominence** - Prominence seen at solar limb
 
-## 技术栈
+## Examples
 
-- **数据处理**: NumPy, SciPy, Astropy
-- **太阳物理**: SunPy, Helioprojective 坐标系
-- **可视化**: Matplotlib, GridSpec
-- **光流计算**: OpenCV (Farneback), pyflct (FLCT)
-- **FITS I/O**: astropy.io.fits
+See the included Jupyter notebook `chase.ipynb` for complete workflow examples:
+- Data loading and basic visualization
+- Image alignment and video generation
+- Filament detection and mask extraction
+- LOS velocity calculation using cloud model
+- POS velocity calculation using FLCT
+- 3D velocity field visualization
 
-## 参考信息
+## Contributing
 
-- **卫星**: CHASE (Chinese H-alpha Solar Explorer)
-- **仪器**: RSM (Ramsey Spectral Module)
-- **光谱线**: Hα (6562.8 Å)
-- **空间分辨率**: ~1.04 arcsec/pixel
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-## 关键函数速查表
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-| 功能 | 函数 |
-|------|------|
-| 对齐 | `align_images_by_crpix()`, `align_submaps_by_crpix()` |
-| 分类 | `classify_region()`, `wave_pattern()` |
-| LOS速度 | `moment_velocity_emission()`, `velocity_map_from_mask_on_limb()` |
-| POS速度 | `pos_velocity_from_masks()`, `pos_velocity_from_masks_dense()` |
-| 谱线 | `gaussfit()`, `bi_sectrix()`, `pearson()` |
-| 视频 | `create_aligned_video()`, `create_aligned_subplot_video()`, `create_comparison_video()` |
+## License
 
-## 笔记
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-- 数据时间戳使用 ISO 8601 格式
-- 所有坐标基于 Helioprojective 系统
-- 对齐参考帧默认为第一帧
-- 视频生成过程会产生临时文件，完成后自动清理
+## Acknowledgments
+
+- CHASE mission team for providing the data
+- Solar physics community for methodologies and algorithms
+- Contributors and users of the package
+
+## Contact
+
+For questions, issues, or suggestions, please open an issue on GitHub.
 
 ---
 
-**最后更新**: 2025年12月17日
+**Last Updated**: 2026-01-18
