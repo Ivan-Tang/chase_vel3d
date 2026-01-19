@@ -180,19 +180,17 @@ class Vel3dPipeline:
         return {k: hdr.get(k) for k in keys if k in hdr}
 
     def combine_3d(self, roi_xy, output_frame: str = "image"):
-        self.vel3d = []
-        for i in range(1, len(self.hdrs)):
-            pos = self.pos_vs[i - 1]
-            los = self.los_vs[i]
+        def _worker(args):
+            i, pos, los, hdr = args
             grid = pos.grid or los.grid
             if grid is None:
-                grid = grid_from_header(self.hdrs[i])
+                grid = grid_from_header(hdr)
                 ys, xs = roi_center_pix_to_slices(grid, *roi_xy)
                 grid = subgrid(grid, ys, xs)
 
             mask_roi = None
             if self.masks:
-                full_grid = grid_from_header(self.hdrs[i])
+                full_grid = grid_from_header(hdr)
                 ys, xs = roi_center_pix_to_slices(full_grid, *roi_xy)
                 mask_roi = self.masks[i][ys, xs]
 
@@ -200,10 +198,16 @@ class Vel3dPipeline:
             if output_frame == "solar":
                 vx, vy, vz = rotate_vec_image_to_solar(vx, vy, vz, grid.rot_deg, grid.b0_deg)
 
-            meta = self._header_meta(self.hdrs[i])
+            meta = self._header_meta(hdr)
             meta.update({"output_frame": output_frame})
             vel = Velocity3D(vx=vx, vy=vy, vz=vz, grid=grid, mask=mask_roi, meta=meta)
-            self.vel3d.append(vel)
+            return vel
+
+        with _futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+            self.vel3d = list(executor.map(_worker, [
+                (i, self.pos_vs[i - 1], self.los_vs[i], self.hdrs[i])
+                for i in range(1, len(self.hdrs))
+            ]))
         return self.vel3d
 
 
