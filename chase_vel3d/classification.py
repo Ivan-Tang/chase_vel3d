@@ -200,7 +200,14 @@ def compute_Rint_map(
     if idx_line.sum() < 3:
         raise ValueError("Line integration window invalid for current wavelength range.")
 
-    Rint = np.nanmean(R[idx_line, :, :], axis=0)  # (ny,nx)
+    # Extract the line region
+    R_line = R[idx_line, :, :]
+
+    # Check if there are any non-NaN values to avoid RuntimeWarning
+    if np.all(np.isnan(R_line)):
+        Rint = np.full((ny, nx), np.nan, dtype=np.float32)
+    else:
+        Rint = np.nanmean(R_line, axis=0)  # (ny,nx)
 
     # 日面外强制无效
     Rint[~disk_mask] = np.nan

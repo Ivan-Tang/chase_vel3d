@@ -9,6 +9,7 @@ import scipy.ndimage as ndi
 from pyflct import flct
 
 from .utils import get_solar_center, get_obstime, get_arcsec_per_pix
+from .coords import roi_center_pix_to_slices, grid_from_header
 
 ### POS velocity
 KM_PER_ARCSEC = 725.0    # km/arcsec at solar center
@@ -94,16 +95,15 @@ def compute_pos_v(
     arcsec_per_pix = get_arcsec_per_pix(hdr1)
     km_per_pix = arcsec_per_pix * KM_PER_ARCSEC
 
-    center = get_solar_center(hdr1)
+    # Use consistent ROI slicing with roi_center_pix_to_slices
+    grid = grid_from_header(hdr1)
     x0, x1, y0, y1 = roi_xy
+    ys, xs = roi_center_pix_to_slices(grid, x0, x1, y0, y1)
 
-    x0, x1 = int(x0 + center[0]), int(x1 + center[0])
-    y0, y1 = int(y0 + center[1]), int(y1 + center[1])
+    # Extract ROI from absorption proxy maps
+    G1_roi = G1[ys, xs]
+    G2_roi = G2[ys, xs]
 
-    G1_roi = G1[y0:y1, x0:x1]
-    G2_roi = G2[y0:y1, x0:x1]
-
-    
     t1 = get_obstime(hdr1)
     t2 = get_obstime(hdr2)
     deltat = abs((t2 - t1).to_value('s'))
@@ -111,7 +111,9 @@ def compute_pos_v(
     vx, vy, vm = flct(G1_roi, G2_roi, deltat=deltat, deltas=km_per_pix, sigma=sigma)
 
     if mask1 is not None and mask2 is not None:
-        mask_roi = (mask1[y0:y1, x0:x1] & mask2[y0:y1, x0:x1])
+        mask1_roi = mask1[ys, xs]
+        mask2_roi = mask2[ys, xs]
+        mask_roi = mask1_roi & mask2_roi
         vx = np.where(mask_roi, vx, np.nan)
         vy = np.where(mask_roi, vy, np.nan)
         vm = np.where(mask_roi, vm, np.nan)
